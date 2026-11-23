@@ -1,4 +1,3 @@
-
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { supabase } from '../services/supabase'
@@ -13,8 +12,9 @@ const loading = ref(false)
 const message = ref('')
 const messageType = ref('success')
 const coordinates = ref(null)
-const photoPreview = ref(null)
+const cameraError = ref('')
 
+// ============ KAMERA ============
 async function startCamera() {
   try {
     stream.value = await navigator.mediaDevices.getUserMedia({
@@ -26,11 +26,17 @@ async function startCamera() {
       audio: false
     })
 
-    video.value.srcObject = stream.value
-    await video.value.play()
-    cameraActive.value = true
+    if (video.value) {
+      video.value.srcObject = stream.value
+      await video.value.play()
+      cameraActive.value = true
+      cameraError.value = ''
+    }
   } catch (error) {
-    showMessage('Tidak dapat mengakses kamera: ' + error.message, 'error')
+    cameraActive.value = false
+    cameraError.value =
+      'Kamera belum dapat diakses. Izinkan akses kamera pada browser lalu muat ulang halaman.'
+    showMessage(cameraError.value + ' ' + error.message, 'error')
   }
 }
 
@@ -40,7 +46,7 @@ function stopCamera() {
   cameraActive.value = false
 }
 
-
+// ============ GPS ============
 function getLocation() {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -56,35 +62,33 @@ function getLocation() {
           accuracy: position.coords.accuracy
         })
       },
-
       error => {
-        let message = ''
+        let msg = ''
         switch (error.code) {
           case 1:
-            message = 'Izin lokasi ditolak. Aktifkan Location pada pengaturan browser.'
+            msg = 'Izin lokasi ditolak. Aktifkan Location pada pengaturan browser.'
             break
           case 2:
-            message = 'Lokasi tidak tersedia. Periksa Location Services perangkat.'
+            msg = 'Lokasi tidak tersedia. Periksa Location Services perangkat.'
             break
           case 3:
-            message = 'GPS timeout. Coba lagi atau gunakan perangkat lain.'
+            msg = 'GPS timeout. Coba lagi atau gunakan perangkat lain.'
             break
           default:
-            message = 'Terjadi kesalahan saat mengambil lokasi.'
+            msg = 'Terjadi kesalahan saat mengambil lokasi.'
         }
-        reject(new Error(message))
+        reject(new Error(msg))
       },
-
-{
-  enableHighAccuracy: false,
-  timeout: 30000,
-  maximumAge: 10000
-}
+      {
+        enableHighAccuracy: true,
+        timeout: 30000,
+        maximumAge: 10000
+      }
     )
   })
 }
 
-
+// ============ CAPTURE ============
 function capturePhoto() {
   if (!video.value || !video.value.videoWidth) {
     throw new Error('Kamera belum siap')
@@ -95,27 +99,22 @@ function capturePhoto() {
   element.height = video.value.videoHeight
 
   const context = element.getContext('2d')
-
-  // Mirror agar hasil selfie terlihat natural
   context.translate(element.width, 0)
   context.scale(-1, 1)
-  context.drawImage(
-    video.value,
-    0,
-    0,
-    element.width,
-    element.height
-  )
+  context.drawImage(video.value, 0, 0, element.width, element.height)
 
   return new Promise((resolve, reject) => {
-    element.toBlob(blob => {
-      if (!blob) {
-        reject(new Error('Gagal mengambil foto'))
-        return
-      }
-
-      resolve(blob)
-    }, 'image/jpeg', 0.85)
+    element.toBlob(
+      blob => {
+        if (!blob) {
+          reject(new Error('Gagal mengambil foto'))
+          return
+        }
+        resolve(blob)
+      },
+      'image/jpeg',
+      0.85
+    )
   })
 }
 
@@ -124,11 +123,12 @@ function showMessage(text, type = 'success') {
   messageType.value = type
 }
 
+// ============ SUBMIT ============
 async function submitAttendance() {
   if (loading.value) return
 
   if (!cameraActive.value) {
-    showMessage('Aktifkan kamera terlebih dahulu', 'error')
+    showMessage('Kamera belum aktif. Mohon tunggu sebentar atau muat ulang halaman.', 'error')
     return
   }
 
@@ -141,33 +141,26 @@ async function submitAttendance() {
   message.value = ''
 
   try {
-    // 1. Ambil foto
     const photoBlob = await capturePhoto()
-    photoPreview.value = URL.createObjectURL(photoBlob)
-
-    // 2. Ambil lokasi GPS
     const location = await getLocation()
     coordinates.value = location
 
-    // 3. Upload foto ke Supabase Storage
     const fileName = `${crypto.randomUUID()}.jpg`
-    const photoPath = `demo/${fileName}`
 
-    const { error: uploadError } = await supabase.storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
       .from('attendance-photos')
-      .upload(photoPath, photoBlob, {
+      .upload(fileName, photoBlob, {
         contentType: 'image/jpeg',
         upsert: false
       })
 
     if (uploadError) throw uploadError
 
-    // 4. Simpan data absensi
     const { error: insertError } = await supabase
       .from('attendance')
       .insert({
         employee_name: employeeName.value.trim(),
-        photo_path: photoPath,
+        photo_path: uploadData.path,
         latitude: location.latitude,
         longitude: location.longitude,
         accuracy: location.accuracy,
@@ -176,32 +169,22 @@ async function submitAttendance() {
 
     if (insertError) throw insertError
 
-    showMessage(
-      'Absensi berhasil! Foto dan lokasi sudah dikirim ke admin.',
-      'success'
-    )
-
+    showMessage('Absensi berhasil! Foto dan lokasi sudah dikirim ke admin.', 'success')
   } catch (error) {
     console.error(error)
-    showMessage(
-      'Absensi gagal: ' + error.message,
-      'error'
-    )
+    showMessage('Absensi gagal: ' + error.message, 'error')
   } finally {
     loading.value = false
   }
 }
 
-onMounted(() => {
-  // Kamera baru aktif setelah pengguna menekan tombol.
+// ============ LIFECYCLE ============
+onMounted(async () => {
+  await startCamera()
 })
 
 onUnmounted(() => {
   stopCamera()
-
-  if (photoPreview.value) {
-    URL.revokeObjectURL(photoPreview.value)
-  }
 })
 </script>
 
@@ -237,23 +220,20 @@ onUnmounted(() => {
           <span class="camera-icon">📷</span>
         </div>
 
-        <div class="camera-container">
-          <video
-            ref="video"
-            v-show="cameraActive"
-            autoplay
-            muted
-            playsinline
-          ></video>
-
-          <div v-if="!cameraActive" class="camera-placeholder">
-            <div class="camera-placeholder-icon">📸</div>
-            <h3>Kamera belum aktif</h3>
-            <p>Aktifkan kamera untuk memulai absensi.</p>
-          </div>
-        </div>
-
+        <!-- Video stream tersembunyi: kamera tetap jalan untuk capture -->
+        <video
+          ref="video"
+          class="camera-stream-hidden"
+          autoplay
+          muted
+          playsinline
+        ></video>
         <canvas ref="canvas" hidden></canvas>
+
+        <!-- Status kamera (info kecil, bukan button) -->
+        <div v-if="!cameraActive" class="camera-status">
+          <p>⏳ Menyiapkan kamera...</p>
+        </div>
 
         <div class="form-group">
           <label>Nama Karyawan</label>
@@ -265,37 +245,16 @@ onUnmounted(() => {
           <small>Nama sementara untuk demonstrasi.</small>
         </div>
 
+        <!-- HANYA tombol absen -->
         <button
-          v-if="!cameraActive"
-          class="btn-secondary"
-          @click="startCamera"
-        >
-          📷 Aktifkan Kamera
-        </button>
-
-        <button
-          v-else
           class="btn-primary"
-          :disabled="loading"
+          :disabled="loading || !cameraActive"
           @click="submitAttendance"
         >
-          {{ loading ? 'Mengirim Absensi...' : '📍 ABSEN SEKARANG' }}
+          {{ loading ? 'Mengirim Absensi...' : cameraActive ? '📍 ABSEN SEKARANG' : 'Menyiapkan Kamera...' }}
         </button>
 
-        <button
-          v-if="cameraActive"
-          class="btn-stop"
-          @click="stopCamera"
-          :disabled="loading"
-        >
-          Matikan Kamera
-        </button>
-
-        <div
-          v-if="message"
-          class="message-box"
-          :class="messageType"
-        >
+        <div v-if="message" class="message-box" :class="messageType">
           {{ message }}
         </div>
 
@@ -307,9 +266,30 @@ onUnmounted(() => {
         </div>
       </section>
 
-      <p class="footer-note">
-        CarWash Attendance · Prototype V1
-      </p>
+      <p class="footer-note">CarWash Attendance · Prototype V1</p>
     </main>
   </div>
 </template>
+
+<style scoped>
+/* Sembunyikan video stream sepenuhnya dari tampilan */
+.camera-stream-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.camera-status {
+  text-align: center;
+  padding: 12px;
+  background: #fff7e6;
+  border: 1px solid #ffe0a3;
+  border-radius: 10px;
+  color: #8a6d3b;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+</style>
