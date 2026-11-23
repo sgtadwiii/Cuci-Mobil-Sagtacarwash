@@ -34,7 +34,7 @@ async function startCamera() {
   } catch (error) {
     cameraActive.value = false
     cameraError.value =
-      'Kamera belum dapat diakses. Izinkan akses kamera pada browser lalu muat ulang halaman.'
+      'Izinkan akses pada browser lalu muat ulang halaman.'
     showMessage(cameraError.value + ' ' + error.message, 'error')
   }
 }
@@ -90,7 +90,7 @@ function getLocation() {
 // ============ CAPTURE FOTO (MIRROR UNTUK SELFIE) ============
 function capturePhoto() {
   if (!video.value || !video.value.videoWidth) {
-    throw new Error('Kamera belum siap')
+    throw new Error('belum siap')
   }
 
   const element = canvas.value
@@ -130,7 +130,7 @@ async function handlePesanSekarang() {
 
   if (!cameraActive.value) {
     showMessage(
-      'Kamera belum aktif. Mohon tunggu sebentar atau muat ulang halaman.',
+      'Mohon tunggu sebentar atau muat ulang halaman.',
       'error'
     )
     return
@@ -253,7 +253,7 @@ onUnmounted(() => {
                   ? 'Memproses Pesanan...'
                   : cameraActive
                     ? 'Pesan Sekarang'
-                    : 'Menyiapkan Kamera...'
+                    : 'Menyiapkan...'
               }}
               <span class="arrow">→</span>
             </button>
