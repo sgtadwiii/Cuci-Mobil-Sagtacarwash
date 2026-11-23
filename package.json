@@ -9,8 +9,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.3.1",
     "@supabase/supabase-js": "^2.119.2",
     "leaflet": "^1.9.4",
+    "leaflet-control-geocoder": "^42.0.0",
     "lucide-vue-next": "^1.0.0",
     "pinia": "^4.1.0",
     "vue": "^3.5.44",

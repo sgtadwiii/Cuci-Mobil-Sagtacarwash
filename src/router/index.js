@@ -15,7 +15,7 @@ const routes = [
     component: EmployeeView
   },
   {
-    path: '/admin',
+    path: '/adminganteng',
     name: 'Admin',
     component: AdminView
   }
